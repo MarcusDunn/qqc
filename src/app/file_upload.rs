@@ -4,18 +4,22 @@ use std::path::PathBuf;
 use std::sync::mpsc::Sender;
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn open_upload_dialog(sender: Sender<Vec<u8>>) {
-    let file = rfd::FileDialog::new()
-        .add_filter("json", &["json"])
-        .pick_file();
+pub fn open_upload_dialog(
+    sender: Sender<Vec<u8>>,
+    (name, ext): (&'static str, &'static [&'static str]),
+) {
+    let file = rfd::FileDialog::new().add_filter(name, ext).pick_file();
     read_and_send(sender, file)
 }
 
 #[cfg(target_arch = "wasm32")]
-pub fn open_upload_dialog(sender: Sender<Vec<u8>>) {
+pub fn open_upload_dialog(
+    sender: Sender<Vec<u8>>,
+    (name, ext): (&'static str, &'static [&'static str]),
+) {
     wasm_bindgen_futures::spawn_local(async move {
         let file = rfd::AsyncFileDialog::new()
-            .add_filter("json", &["json"])
+            .add_filter(name, ext)
             .pick_file()
             .await;
         if let Some(file) = file {
