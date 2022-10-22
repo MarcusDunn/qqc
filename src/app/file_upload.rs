@@ -1,3 +1,4 @@
+use rfd::FileHandle;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
@@ -18,7 +19,9 @@ pub fn open_upload_dialog(sender: Sender<Vec<u8>>) {
             .add_filter("json", &["json"])
             .pick_file()
             .await;
-        read_and_send(sender, file);
+        if let Some(file) = file {
+            sender.send(file.read().await).expect("failed to send file")
+        }
     })
 }
 
