@@ -21,6 +21,8 @@ pub fn open_upload_dialog(sender: Sender<Vec<u8>>) {
             .await;
         if let Some(file) = file {
             sender.send(file.read().await).expect("failed to send file")
+        } else {
+            tracing::warn!("no file picked!")
         }
     })
 }
