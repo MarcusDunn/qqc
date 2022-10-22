@@ -1,5 +1,4 @@
-use std::cmp::{max, min};
-use std::collections::BTreeMap;
+use std::cmp::min;
 
 use crate::app::{Interview, Section};
 
@@ -59,10 +58,6 @@ impl InterviewSwiper {
         } else {
             panic!("index was invalid")
         }
-    }
-
-    pub fn current(&self) -> &Section {
-        &self.interview.sections[self.index]
     }
 
     pub fn current_mut(&mut self) -> &mut Section {
@@ -166,7 +161,7 @@ mod tests {
 fn test_window() {
     let swiper = InterviewSwiper {
         interview: Interview {
-            speakers: BTreeMap::default(),
+            speakers: std::collections::BTreeMap::default(),
             sections: vec![
                 Section {
                     speaker_id: 0,
@@ -208,7 +203,7 @@ fn test_window() {
 fn test_window_3() {
     let swiper = InterviewSwiper {
         interview: Interview {
-            speakers: BTreeMap::default(),
+            speakers: std::collections::BTreeMap::default(),
             sections: vec![Section {
                 speaker_id: 0,
                 text: "0th".to_string(),

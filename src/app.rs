@@ -1,6 +1,4 @@
-use egui::Button;
 use std::collections::{BTreeMap, BTreeSet};
-use std::convert::Infallible;
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 
 use tracing::error;
