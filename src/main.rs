@@ -6,7 +6,6 @@ use qqc::QualityQualitativeCoding;
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
-    // Log to stdout (if you run with `RUST_LOG=debug`).
     tracing_subscriber::fmt::init();
 
     let native_options = eframe::NativeOptions::default();
@@ -17,7 +16,7 @@ fn main() {
     );
 }
 
-// when compiling to web using trunk.
+// when compiling to web
 #[cfg(target_arch = "wasm32")]
 fn main() {
     // Make sure panics are logged using `console.error`.
