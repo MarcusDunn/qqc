@@ -6,7 +6,7 @@ pub fn from_json_slice(slice: &[u8]) -> serde_json::Result<Interview> {
     serde_json::from_slice::<InterviewFormat>(slice).map(Interview::from)
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(serde::Deserialize)]
 #[serde(untagged)]
 enum InterviewFormat {
     /// not sure what to call this format for now

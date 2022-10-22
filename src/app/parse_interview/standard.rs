@@ -4,27 +4,27 @@ use std::hash::{Hash, Hasher};
 
 use crate::app::{Interview, Section};
 
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(serde::Deserialize)]
 pub struct Root {
     segments: Vec<Segment>,
     speakers: Vec<Speaker>,
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(serde::Deserialize)]
 struct Speaker {
     #[serde(rename = "spkid")]
     speaker_id: String,
     name: String,
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(serde::Deserialize)]
 struct Segment {
     #[serde(rename = "speaker")]
     speaker_id: String,
     words: Vec<Word>,
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(serde::Deserialize)]
 struct Word {
     text: String,
 }
