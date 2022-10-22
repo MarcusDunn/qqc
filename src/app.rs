@@ -72,7 +72,7 @@ impl eframe::App for QualityQualitativeCoding {
 
         let Self {
             interview,
-            codes,
+            codes: _,
             file_channel: (sender, receiver),
         } = self;
 
