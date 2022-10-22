@@ -10,7 +10,7 @@ fn main() {
 
     let native_options = eframe::NativeOptions::default();
     eframe::run_native(
-        "eframe template",
+        "quality qualitative coding",
         native_options,
         Box::new(|cc| Box::new(QualityQualitativeCoding::new(cc))),
     );
