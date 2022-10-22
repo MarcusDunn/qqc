@@ -516,15 +516,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "egui-toast"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "942110427db2ff7767e3416b2fdbe43d8dd444d2fb745b554420149de08b9bc5"
-dependencies = [
- "egui",
-]
-
-[[package]]
 name = "egui-winit"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1359,7 +1350,6 @@ dependencies = [
  "console_error_panic_hook",
  "eframe",
  "egui",
- "egui-toast",
  "rfd",
  "serde",
  "serde_json",

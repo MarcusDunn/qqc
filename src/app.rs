@@ -1,9 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
-use std::time::Duration;
-
-use egui::Direction;
-use egui_toast::Toasts;
 
 mod file_upload;
 mod parse_interview;
@@ -66,10 +62,6 @@ impl QualityQualitativeCoding {
 
 impl eframe::App for QualityQualitativeCoding {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
-        let mut toasts = Toasts::new()
-            .anchor(ctx.available_rect().right_bottom())
-            .direction(Direction::BottomUp);
-
         let Self {
             interview,
             codes: _,
@@ -85,10 +77,6 @@ impl eframe::App for QualityQualitativeCoding {
                     }
                     Err(err) => {
                         tracing::trace!(error = ?err, "failed to parse json");
-                        toasts.error(
-                            format!("Could not parse JSON {}", err),
-                            Duration::from_secs(3),
-                        );
                     }
                 };
             }
@@ -108,8 +96,6 @@ impl eframe::App for QualityQualitativeCoding {
                 ui.heading("coding interview");
             }
         });
-
-        toasts.show(ctx);
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
