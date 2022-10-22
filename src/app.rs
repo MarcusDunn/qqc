@@ -1,115 +1,117 @@
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
+use std::time::Duration;
+
+use egui::Direction;
+use egui_toast::Toasts;
+
+mod file_upload;
+mod parse_interview;
+
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct QualityQualitativeCoding {
-    // Example stuff:
-    label: String,
-
-    // this how you opt-out of serialization of a member
+    /// the interview itself
+    interview: Option<Interview>,
+    /// the codes to choose from
+    codes: BTreeSet<Code>,
+    /// receive files asynchronously
     #[serde(skip)]
-    value: f32,
+    file_channel: (Sender<Vec<u8>>, Receiver<Vec<u8>>),
 }
 
 impl Default for QualityQualitativeCoding {
     fn default() -> Self {
         Self {
-            // Example stuff:
-            label: "Hello World!".to_owned(),
-            value: 2.7,
+            interview: None,
+            codes: BTreeSet::default(),
+            file_channel: channel(),
         }
     }
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Ord, PartialOrd, Eq, PartialEq, Hash, Debug)]
+struct Code {
+    name: String,
+    description: String,
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Default, Debug)]
+pub struct Interview {
+    /// speaker_id and names
+    speakers: BTreeMap<u64, String>,
+    /// the sections of speach
+    sections: Vec<Section>,
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Default, Debug)]
+pub struct Section {
+    speaker_id: u64,
+    text: String,
+    codes: BTreeSet<String>,
 }
 
 impl QualityQualitativeCoding {
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        // This is also where you can customized the look at feel of egui using
-        // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
-
         // Load previous app state (if any).
-        // Note that you must enable the `persistence` feature for this to work.
         if let Some(storage) = cc.storage {
-            return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
+            eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default()
+        } else {
+            QualityQualitativeCoding::default()
         }
-
-        Default::default()
     }
 }
 
 impl eframe::App for QualityQualitativeCoding {
-    /// Called each time the UI needs repainting, which may be many times per second.
-    /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let Self { label, value } = self;
+    fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
+        let mut toasts = Toasts::new()
+            .anchor(ctx.available_rect().right_bottom())
+            .direction(Direction::BottomUp);
 
-        // Examples of how to create different panels and windows.
-        // Pick whichever suits you.
-        // Tip: a good default choice is to just keep the `CentralPanel`.
-        // For inspiration and more examples, go to https://emilk.github.io/egui
+        let Self {
+            interview,
+            codes,
+            file_channel: (sender, receiver),
+        } = self;
 
-        #[cfg(not(target_arch = "wasm32"))] // no File->Quit on web pages!
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            // The top panel is often a good place for a menu bar:
-            egui::menu::bar(ui, |ui| {
-                ui.menu_button("File", |ui| {
-                    if ui.button("Quit").clicked() {
-                        _frame.close();
+        match receiver.try_recv() {
+            Ok(bytes) => {
+                match parse_interview::from_json_slice(&*bytes) {
+                    Ok(parsed_interview) => {
+                        tracing::trace!("parsed interview");
+                        *interview = Some(parsed_interview)
                     }
-                });
-            });
-        });
-
-        egui::SidePanel::left("side_panel").show(ctx, |ui| {
-            ui.heading("Side Panel");
-
-            ui.horizontal(|ui| {
-                ui.label("Write something: ");
-                ui.text_edit_singleline(label);
-            });
-
-            ui.add(egui::Slider::new(value, 0.0..=10.0).text("value"));
-            if ui.button("Increment").clicked() {
-                *value += 1.0;
+                    Err(err) => {
+                        tracing::trace!(error = ?err, "failed to parse json");
+                        toasts.error(
+                            format!("Could not parse JSON {}", err),
+                            Duration::from_secs(3),
+                        );
+                    }
+                };
             }
-
-            ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = 0.0;
-                    ui.label("powered by ");
-                    ui.hyperlink_to("egui", "https://github.com/emilk/egui");
-                    ui.label(" and ");
-                    ui.hyperlink_to(
-                        "eframe",
-                        "https://github.com/emilk/egui/tree/master/crates/eframe",
-                    );
-                    ui.label(".");
-                });
-            });
-        });
-
-        egui::CentralPanel::default().show(ctx, |ui| {
-            // The central panel the region left after adding TopPanel's and SidePanel's
-
-            ui.heading("eframe template");
-            ui.hyperlink("https://github.com/emilk/eframe_template");
-            ui.add(egui::github_link_file!(
-                "https://github.com/emilk/eframe_template/blob/master/",
-                "Source code."
-            ));
-            egui::warn_if_debug_build(ui);
-        });
-
-        if false {
-            egui::Window::new("Window").show(ctx, |ui| {
-                ui.label("Windows can be moved by dragging them.");
-                ui.label("They are automatically sized based on contents.");
-                ui.label("You can turn on resizing and scrolling if you like.");
-                ui.label("You would normally chose either panels OR windows.");
-            });
+            Err(TryRecvError::Empty) => { /* no file has been uploaded yet - no problem! */ }
+            Err(TryRecvError::Disconnected) => {
+                panic!("impossible to upload files. sender has been dropped.")
+            }
         }
+
+        egui::CentralPanel::default().show(ctx, |ui| match interview {
+            None => {
+                if ui.button("Upload interview").clicked() {
+                    file_upload::open_upload_dialog(sender.clone())
+                }
+            }
+            Some(_) => {
+                ui.heading("coding interview");
+            }
+        });
+
+        toasts.show(ctx);
     }
 
-    /// Called by the frame work to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, eframe::APP_KEY, self);
     }
