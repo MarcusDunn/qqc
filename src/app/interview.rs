@@ -4,25 +4,31 @@ use crate::app::{Interview, Section};
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 pub struct InterviewSwiper {
-    interview: Interview,
+    pub interview: Interview,
     index: usize,
 }
 
 impl InterviewSwiper {
     pub(crate) fn try_prev(&mut self) -> Option<usize> {
         let option = self.index.checked_sub(1)?;
-        self.interview.sections.get(option)?;
-        self.index += 1;
-        Some(self.index)
+        if self.interview.sections.get(option).is_some() {
+            self.index = option;
+            Some(self.index)
+        } else {
+            None
+        }
     }
 }
 
 impl InterviewSwiper {
     pub(crate) fn try_next(&mut self) -> Option<usize> {
         let option = self.index.checked_add(1)?;
-        self.interview.sections.get(option)?;
-        self.index += 1;
-        Some(self.index)
+        if self.interview.sections.get(option).is_some() {
+            self.index = option;
+            Some(self.index)
+        } else {
+            None
+        }
     }
 }
 
@@ -37,17 +43,21 @@ impl InterviewSwiper {
         }
     }
 
-    pub fn window(&self, behind: usize, ahead: usize) -> (&[Section], &Section, &[Section]) {
-        let (before, after) = self.interview.sections.split_at(self.index);
-        let before = &before[self.index.saturating_sub(behind)..];
+    pub fn window_mut(
+        &mut self,
+        behind: usize,
+        ahead: usize,
+    ) -> (&mut [Section], &mut Section, &mut [Section]) {
+        let (before, after) = self.interview.sections.split_at_mut(self.index);
+        let before = &mut before[self.index.saturating_sub(behind)..];
         debug_assert!(
             before.len() <= behind,
             "expected {} <= {}",
             before.len(),
             behind
         );
-        if let Some((curr, after)) = after.split_first() {
-            let after = &after[0..min(after.len(), ahead)];
+        if let Some((curr, after)) = after.split_first_mut() {
+            let after = &mut after[0..min(after.len(), ahead)];
             debug_assert!(
                 after.len() <= ahead,
                 "expected {} <= {}",

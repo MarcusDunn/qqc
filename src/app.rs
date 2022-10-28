@@ -1,9 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 
-use tracing::error;
+use egui::{Context, Key};
+use tracing::{error, info};
 
 use crate::app::interview::InterviewSwiper;
+use crate::app::number_selector::number_changer;
 use crate::app::section::{primary_section, secondary_section};
 
 mod file_upload;
@@ -18,7 +20,7 @@ pub struct QualityQualitativeCoding {
     /// the interview itself
     interview: Option<InterviewSwiper>,
     /// the codes to choose from
-    codes: BTreeMap<u64, Code>,
+    codes: Vec<Code>,
     /// a code the user has not added yet,
     code_builder: Code,
     /// receive files asynchronously
@@ -26,15 +28,75 @@ pub struct QualityQualitativeCoding {
     interview_channel: (Sender<Vec<u8>>, Receiver<Vec<u8>>),
     #[serde(skip)]
     codes_channel: (Sender<Vec<u8>>, Receiver<Vec<u8>>),
+    settings_open: bool,
+    export_codes_open: bool,
+    export_interview_open: bool,
 }
+
+impl QualityQualitativeCoding {
+    pub(crate) fn handle_keyboard_shortcuts(&mut self, ctx: &Context) {
+        let shortcut_map = &self.settings.shortcut_map;
+        Self::handle_next(&mut self.interview, ctx, shortcut_map);
+        Self::handle_prev(&mut self.interview, ctx, shortcut_map);
+    }
+
+    fn handle_prev(
+        interview: &mut Option<InterviewSwiper>,
+        ctx: &Context,
+        shortcut_map: &BTreeMap<Action, Key>,
+    ) {
+        if ctx.input().key_pressed(
+            shortcut_map
+                .get(&Action::Prev)
+                .copied()
+                .unwrap_or(Key::ArrowLeft),
+        ) {
+            if let Some(interview) = interview {
+                interview.try_prev();
+            }
+        }
+    }
+
+    fn handle_next(
+        interview: &mut Option<InterviewSwiper>,
+        ctx: &Context,
+        shortcut_map: &BTreeMap<Action, Key>,
+    ) {
+        if ctx.input().key_pressed(
+            shortcut_map
+                .get(&Action::Next)
+                .copied()
+                .unwrap_or(Key::ArrowRight),
+        ) {
+            if let Some(interview) = interview {
+                interview.try_next();
+            }
+        }
+    }
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Debug, Ord, PartialOrd, Eq, PartialEq)]
+enum Action {
+    Next,
+    Prev,
+}
+
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 struct Settings {
     code_columns: usize,
+    shortcut_map: BTreeMap<Action, Key>,
+    context_before: usize,
+    context_after: usize,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { code_columns: 5 }
+        Self {
+            code_columns: 5,
+            shortcut_map: BTreeMap::default(),
+            context_before: 1,
+            context_after: 1,
+        }
     }
 }
 
@@ -43,13 +105,16 @@ impl Default for QualityQualitativeCoding {
         Self {
             settings: Default::default(),
             interview: None,
-            codes: BTreeMap::default(),
+            codes: Vec::default(),
             code_builder: Code {
                 name: "".to_string(),
                 description: "".to_string(),
             },
             interview_channel: channel(),
             codes_channel: channel(),
+            settings_open: false,
+            export_codes_open: false,
+            export_interview_open: false,
         }
     }
 }
@@ -73,7 +138,7 @@ pub struct Section {
     speaker_id: u64,
     text: String,
     /// references the key of a code
-    codes: BTreeSet<u64>,
+    codes: BTreeSet<usize>,
 }
 
 impl QualityQualitativeCoding {
@@ -87,16 +152,20 @@ impl QualityQualitativeCoding {
         }
     }
 
-    fn try_update_codes(_: &mut BTreeMap<u64, Code>, codes_recv: &mut Receiver<Vec<u8>>) {
+    fn try_update_codes(codes: &mut Vec<Code>, codes_recv: &mut Receiver<Vec<u8>>) {
         match codes_recv.try_recv() {
-            Ok(bytes) => match String::from_utf8(bytes) {
-                Ok(_) => {
-                    todo!()
+            Ok(bytes) => {
+                codes.clear();
+                let mut reader = csv::Reader::from_reader(&bytes[..]);
+                for record in reader.deserialize::<Code>() {
+                    match record {
+                        Ok(record) => codes.push(record),
+                        Err(err) => {
+                            error!(error = ?err, "failed to parse csv")
+                        }
+                    }
                 }
-                Err(err) => {
-                    error!(error = ?err, "failed to parse string")
-                }
-            },
+            }
             Err(TryRecvError::Empty) => { /* no file has been uploaded yet - no problem! */ }
             Err(TryRecvError::Disconnected) => {
                 panic!("impossible to upload files. sender has been dropped.")
@@ -127,13 +196,10 @@ impl QualityQualitativeCoding {
         }
     }
 
-    fn add_new_code(codes: &mut BTreeMap<u64, Code>, code_builder: &mut Code) {
+    fn add_new_code(codes: &mut Vec<Code>, code_builder: &mut Code) {
         let name = std::mem::take(&mut code_builder.name);
         let description = std::mem::take(&mut code_builder.description);
-        codes.insert(
-            codes.keys().max().copied().unwrap_or(0) + 1,
-            Code { name, description },
-        );
+        codes.push(Code { name, description });
     }
 
     fn open_tsv_upload_dialog(codes_tx: &mut Sender<Vec<u8>>) {
@@ -146,7 +212,9 @@ impl QualityQualitativeCoding {
 }
 
 impl eframe::App for QualityQualitativeCoding {
-    fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &Context, _: &mut eframe::Frame) {
+        self.handle_keyboard_shortcuts(ctx);
+
         let Self {
             interview,
             codes,
@@ -154,33 +222,110 @@ impl eframe::App for QualityQualitativeCoding {
             interview_channel: (interview_tx, interview_rx),
             codes_channel: (codes_tx, codes_rx),
             settings,
+            settings_open,
+            export_codes_open,
+            export_interview_open,
         } = self;
 
         Self::try_update_interview(interview, interview_rx);
         Self::try_update_codes(codes, codes_rx);
 
-        egui::SidePanel::right("codes edit and create").show(ctx, |ui| {
-            ui.heading("Codes");
-            if codes.is_empty() {
-                ui.label("no codes at the moment, try adding one!");
-            }
-            for (_, Code { name, description }) in codes.iter_mut() {
+        egui::Window::new("export codes")
+            .open(export_codes_open)
+            .show(ctx, |ui| {
+                ui.heading("copy and paste the below text.");
+                ui.label(
+                    codes
+                        .iter()
+                        .map(|Code { description, name }| format!("{}\t{}\n", name, description))
+                        .collect::<String>(),
+                )
+            });
+
+        egui::Window::new("export interview")
+            .open(export_interview_open)
+            .show(ctx, |ui| {});
+
+        egui::Window::new("settings")
+            .open(settings_open)
+            .show(ctx, |ui| {
                 ui.group(|ui| {
-                    ui.text_edit_singleline(name);
-                    ui.text_edit_singleline(description);
+                    ui.label("Codes per row");
+                    ui.add(number_changer(&mut settings.code_columns))
                 });
-            }
-            ui.heading("New Code");
-            ui.label("name");
-            ui.text_edit_singleline(&mut code_builder.name);
-            ui.label("description");
-            ui.text_edit_singleline(&mut code_builder.description);
-            if ui.button("add new code").clicked() {
-                Self::add_new_code(codes, code_builder);
-            }
-            if ui.button("upload").clicked() {
-                Self::open_tsv_upload_dialog(codes_tx);
-            }
+                ui.group(|ui| {
+                    ui.label("number of segments before");
+                    ui.add(number_changer(&mut settings.context_before))
+                });
+                ui.group(|ui| {
+                    ui.label("number of segments after");
+                    ui.add(number_changer(&mut settings.context_after))
+                })
+            });
+
+        egui::TopBottomPanel::top("top bar").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                let export_menu_button = ui.menu_button("export", |ui| {
+                    if !codes.is_empty() && ui.button("codes").clicked() {
+                        *export_codes_open = true;
+                    }
+                    if interview.is_some() && ui.button("interview").clicked() {
+                        *export_interview_open = true;
+                    }
+                });
+                export_menu_button.response.on_hover_text(
+                    if codes.is_empty() && interview.is_none() {
+                        "nothing to export"
+                    } else {
+                        "export work"
+                    },
+                );
+                ui.menu_button("import", |ui| {
+                    if ui.button("codes").clicked() {
+                        Self::open_tsv_upload_dialog(codes_tx);
+                    }
+                });
+                if ui.button("settings").clicked() {
+                    *settings_open = true;
+                }
+            });
+        });
+
+        egui::SidePanel::right("codes edit and create").show(ctx, |ui| {
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                ui.heading("Codes");
+                if codes.is_empty() {
+                    ui.label("no codes at the moment, try adding one or importing");
+                }
+                let mut codes_to_be_removed = Vec::new();
+                for (idx, Code { name, description }) in codes.iter_mut().enumerate() {
+                    ui.group(|ui| {
+                        ui.text_edit_singleline(name);
+                        ui.text_edit_singleline(description);
+                        if ui.button("remove").clicked() {
+                            codes_to_be_removed.push(idx)
+                        }
+                    });
+                }
+                codes_to_be_removed.reverse();
+                for idx in codes_to_be_removed {
+                    codes.remove(idx);
+                    if let Some(interview) = interview {
+                        for section in &mut interview.interview.sections {
+                            section.codes.remove(&idx);
+                        }
+                    }
+                }
+                ui.heading("New Code");
+                ui.label("name");
+                ui.text_edit_singleline(&mut code_builder.name);
+                ui.label("description");
+                ui.text_edit_singleline(&mut code_builder.description);
+                if ui.button("add new code").clicked() {
+                    info!(code = ?code_builder, "adding new code");
+                    Self::add_new_code(codes, code_builder);
+                }
+            });
         });
 
         if let Some(interview) = interview {
@@ -198,17 +343,17 @@ impl eframe::App for QualityQualitativeCoding {
             egui::TopBottomPanel::bottom("codes select").show(ctx, |ui| {
                 let current = interview.current_mut();
                 egui::Grid::new("code grid").show(ui, |ui| {
-                    for (idx, (id, Code { name, description })) in codes.iter().enumerate() {
+                    for (idx, Code { name, description }) in codes.iter().enumerate() {
                         if idx != 0 && idx % settings.code_columns == 0 {
                             ui.end_row()
                         }
-                        let checked = &mut current.codes.contains(id);
+                        let checked = &mut current.codes.contains(&idx);
                         let checkbox = ui.checkbox(checked, name).on_hover_text(description);
                         if checkbox.changed() {
                             if *checked {
-                                current.codes.insert(*id);
+                                current.codes.insert(idx);
                             } else {
-                                current.codes.remove(id);
+                                current.codes.remove(&idx);
                             }
                         }
                     }
@@ -223,14 +368,29 @@ impl eframe::App for QualityQualitativeCoding {
                 }
             }
             Some(interview) => {
+                let InterviewSwiper {
+                    interview: Interview {},
+                    index,
+                } = interview;
                 ui.heading("coding interview");
-                let (before, curr, after) = interview.window(1, 1);
+                let (before, curr, after) =
+                    interview.window_mut(settings.context_before, settings.context_after);
                 for section in before {
-                    ui.add(secondary_section(section));
+                    let section_response = ui.add(secondary_section(
+                        section,
+                        &interview.interview.speakers[&section.speaker_id],
+                    ));
+                    if section_response.clicked() {}
                 }
-                ui.add(primary_section(curr));
+                ui.add(primary_section(
+                    curr,
+                    &interview.interview.speakers[&curr.speaker_id],
+                ));
                 for section in after {
-                    ui.add(secondary_section(section));
+                    ui.add(secondary_section(
+                        section,
+                        &interview.interview.speakers[&section.speaker_id],
+                    ));
                 }
             }
         });
@@ -241,4 +401,5 @@ impl eframe::App for QualityQualitativeCoding {
     }
 }
 
+mod number_selector;
 mod section;
