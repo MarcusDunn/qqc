@@ -299,7 +299,7 @@ impl QualityQualitativeCoding {
     ) {
         match receiver.try_recv() {
             Ok(bytes) => {
-                match parse_interview::from_json_slice(&*bytes) {
+                match parse_interview::from_json_slice(&bytes) {
                     Ok(parsed_interview) => {
                         tracing::trace!("parsed interview");
                         *interview = Some(InterviewSwiper::new(parsed_interview))
