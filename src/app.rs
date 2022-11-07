@@ -144,7 +144,7 @@ mod export_interview {
     pub fn export_interview(codes: &[Code], ui: &mut Ui, interview: &Interview) -> Response {
         #[cfg(target_arch = "wasm32")]
         return export_web(codes, ui, interview);
-        #[cfg(not(arget_arch = "wasm32"))]
+        #[cfg(not(target_arch = "wasm32"))]
         return export_native(codes, ui, interview);
     }
 }
