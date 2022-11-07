@@ -4,3 +4,7 @@
 [![Build Status](https://github.com/emilk/eframe_template/workflows/CI/badge.svg)](https://github.com/emilk/eframe_template/actions?workflow=CI)
 
 Quality Qualitative Coding (qqc) is a small graphical utility to enable collaberative qualitative coding of interviews. Try it out [here](https://marcusdunn.github.io/qqc/)!
+
+## Privacy and Security
+
+All data is stored locally (I simply cannot affort a server!).
