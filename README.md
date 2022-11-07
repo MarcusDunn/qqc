@@ -7,4 +7,8 @@ Quality Qualitative Coding (qqc) is a small graphical utility to enable collaber
 
 ## Privacy and Security
 
-All data is stored locally (I simply cannot affort a server!).
+All data is stored locally as I simply cannot affort a server!
+
+## There's very little javascript given the link you just gave me?
+
+This is written as a cross-platform rust app that can be run both as a native app and in the browser via wasm. This is made possible by the awesome [egui](https://github.com/emilk/egui/) library. 
