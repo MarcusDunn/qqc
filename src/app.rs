@@ -85,7 +85,7 @@ mod export_interview {
     use std::io;
     use tracing::warn;
 
-    #[cfg(arget_arch = "wasm32")]
+    #[cfg(target_arch = "wasm32")]
     fn to_data_url_csv(
         interview: &[Section],
         speakers: &BTreeMap<u64, String>,
@@ -111,7 +111,7 @@ mod export_interview {
         Ok(writer)
     }
 
-    #[cfg(arget_arch = "wasm32")] // todo turn into egui component.
+    #[cfg(target_arch = "wasm32")] // todo turn into egui component.
     fn export_web(codes: &[Code], ui: &mut Ui, interview: &Interview) -> Response {
         match to_data_url_csv(&interview.sections, &interview.speakers, &codes) {
             Ok(data_url) => ui.hyperlink_to("download csv", data_url),
@@ -122,7 +122,7 @@ mod export_interview {
         }
     }
 
-    #[cfg(not(arget_arch = "wasm32"))]
+    #[cfg(not(target_arch = "wasm32"))]
     fn export_native(codes: &[Code], ui: &mut Ui, interview: &Interview) -> Response {
         match write_to_file(codes, interview) {
             Ok(()) => ui.label("wrote to file"),
