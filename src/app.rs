@@ -1,8 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::error::Error;
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 
 use egui::{Context, Key};
-use tracing::{error, info, trace};
+use tracing::{error, info};
 
 use crate::app::interview::InterviewSwiper;
 use crate::app::number_selector::number_changer;
@@ -75,6 +76,70 @@ impl QualityQualitativeCoding {
     }
 }
 
+mod export_interview {
+    use std::collections::BTreeMap;
+    use std::error::Error;
+    use std::fs::File;
+    use std::io;
+    use csv::Writer;
+    use egui::{Response, Ui};
+    use tracing::warn;
+    use crate::app::{Code, CsvSerializableSection, Interview, Section};
+
+    fn to_data_url_csv(interview: &[Section], speakers: &BTreeMap<u64, String>, codes: &[Code]) -> Result<String, Box<dyn Error>> {
+        let writer = to_csv(Vec::new(), interview, speakers, codes);
+        Ok(String::from("data:text/csv") + String::from_utf8(writer?.into_inner()?)?.as_str())
+    }
+
+    fn to_csv<W: io::Write>(write: W, sections: &[Section], speakers: &BTreeMap<u64, String>, codes: &[Code]) -> Result<Writer<W>, Box<dyn Error>> {
+        let mut writer = Writer::from_writer(write);
+        for record in sections.iter().map(|section| CsvSerializableSection::from_section(speakers, codes, &section)) {
+            writer.serialize(record)?;
+        }
+        Ok(writer)
+    }
+
+
+
+    #[cfg(arget_arch = "wasm32")] // todo turn into egui component.
+    fn export_web(codes: &[Code], ui: &mut Ui, interview: &Interview) -> Response {
+        match to_data_url_csv(&interview.sections, &interview.speakers, &codes) {
+            Ok(data_url) => {
+                ui.hyperlink_to("download csv", data_url)
+            }
+            Err(err) => {
+                warn!(err, "failed to turn interview to data url");
+                ui.label("failed")
+            }
+        }
+    }
+
+    #[cfg(not(arget_arch = "wasm32"))]
+    fn export_native(codes: &[Code], ui: &mut Ui, interview: &Interview) -> Response {
+        match write_to_file(codes, interview) {
+            Ok(()) => {
+                ui.label("wrote to file")
+            }
+            Err(err) => {
+                warn!(err, "failed to write to file");
+                ui.label("failed to write to file")
+            }
+        }
+    }
+
+    fn write_to_file(codes: &[Code], interview: &Interview) -> Result<(), Box<dyn Error>>{
+        let mut result = File::options().create(true).write(true).open("export.csv")?;
+        Ok(to_csv(result, &interview.sections, &interview.speakers, codes)?.flush()?)
+    }
+
+    pub fn export_interview(codes: &Vec<Code>, ui: &mut Ui, interview: &Interview) -> Response {
+        #[cfg(arget_arch = "wasm32")]
+        return export_web(codes, ui, interview);
+        #[cfg(not(arget_arch = "wasm32"))]
+        return export_native(codes, ui, interview);
+    }
+}
+
 #[derive(serde::Deserialize, serde::Serialize, Debug, Ord, PartialOrd, Eq, PartialEq)]
 enum Action {
     Next,
@@ -121,7 +186,7 @@ impl Default for QualityQualitativeCoding {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Ord, PartialOrd, Eq, PartialEq, Hash, Debug)]
-struct Code {
+pub struct Code {
     name: String,
     description: String,
 }
@@ -140,6 +205,40 @@ pub struct Section {
     text: String,
     /// references the key of a code
     codes: BTreeSet<usize>,
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
+pub struct CsvSerializableSection {
+    speaker: String,
+    text: String,
+    code0: Option<String>,
+    code1: Option<String>,
+    code2: Option<String>,
+    code3: Option<String>,
+    code4: Option<String>,
+    code5: Option<String>,
+    code6: Option<String>,
+    code7: Option<String>,
+    code8: Option<String>,
+}
+
+impl CsvSerializableSection {
+    fn from_section(speakers: &BTreeMap<u64, String>, codes: &[Code], Section { speaker_id, codes: section_codes, text }: &Section) -> CsvSerializableSection {
+        let mut codes = section_codes.iter().map(|id| codes.get(*id).unwrap()).map(|Code { name, .. }| name);
+        CsvSerializableSection {
+            speaker: speakers[speaker_id].clone(),
+            text: text.clone(),
+            code0: codes.next().map(|next| next.clone()),
+            code1: codes.next().map(|next| next.clone()),
+            code2: codes.next().map(|next| next.clone()),
+            code3: codes.next().map(|next| next.clone()),
+            code4: codes.next().map(|next| next.clone()),
+            code5: codes.next().map(|next| next.clone()),
+            code6: codes.next().map(|next| next.clone()),
+            code7: codes.next().map(|next| next.clone()),
+            code8: codes.next().map(|next| next.clone()),
+        }
+    }
 }
 
 impl QualityQualitativeCoding {
@@ -255,7 +354,16 @@ impl eframe::App for QualityQualitativeCoding {
 
         egui::Window::new("export interview")
             .open(export_interview_open)
-            .show(ctx, |ui| {});
+            .show(ctx, |ui| {
+                match interview {
+                    None => {
+                        ui.label("nothing to export")
+                    }
+                    Some(InterviewSwiper { interview, .. }) => {
+                        export_interview::export_interview(&codes, ui, &interview)
+                    }
+                }
+            });
 
         egui::Window::new("settings")
             .open(settings_open)
