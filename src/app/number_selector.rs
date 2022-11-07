@@ -1,8 +1,6 @@
 use egui::{Response, Ui};
-use std::fmt::Display;
-use std::ops::{AddAssign, SubAssign};
 
-#[must_use]
+
 pub fn number_changer(number: &mut usize) -> impl egui::Widget + '_ {
     move |ui: &mut Ui| number_changer_ui(number, ui)
 }

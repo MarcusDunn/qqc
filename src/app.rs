@@ -1,5 +1,4 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::error::Error;
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 
 use egui::{Context, Key};
@@ -86,6 +85,7 @@ mod export_interview {
     use std::io;
     use tracing::warn;
 
+    #[cfg(arget_arch = "wasm32")]
     fn to_data_url_csv(
         interview: &[Section],
         speakers: &BTreeMap<u64, String>,
@@ -104,7 +104,7 @@ mod export_interview {
         let mut writer = Writer::from_writer(write);
         for record in sections
             .iter()
-            .map(|section| CsvSerializableSection::from_section(speakers, codes, &section))
+            .map(|section| CsvSerializableSection::from_section(speakers, codes, section))
         {
             writer.serialize(record)?;
         }
@@ -134,14 +134,14 @@ mod export_interview {
     }
 
     fn write_to_file(codes: &[Code], interview: &Interview) -> Result<(), Box<dyn Error>> {
-        let mut result = File::options()
+        let result = File::options()
             .create(true)
             .write(true)
             .open("export.csv")?;
         Ok(to_csv(result, &interview.sections, &interview.speakers, codes)?.flush()?)
     }
 
-    pub fn export_interview(codes: &Vec<Code>, ui: &mut Ui, interview: &Interview) -> Response {
+    pub fn export_interview(codes: &[Code], ui: &mut Ui, interview: &Interview) -> Response {
         #[cfg(arget_arch = "wasm32")]
         return export_web(codes, ui, interview);
         #[cfg(not(arget_arch = "wasm32"))]
@@ -248,15 +248,15 @@ impl CsvSerializableSection {
         CsvSerializableSection {
             speaker: speakers[speaker_id].clone(),
             text: text.clone(),
-            code0: codes.next().map(|next| next.clone()),
-            code1: codes.next().map(|next| next.clone()),
-            code2: codes.next().map(|next| next.clone()),
-            code3: codes.next().map(|next| next.clone()),
-            code4: codes.next().map(|next| next.clone()),
-            code5: codes.next().map(|next| next.clone()),
-            code6: codes.next().map(|next| next.clone()),
-            code7: codes.next().map(|next| next.clone()),
-            code8: codes.next().map(|next| next.clone()),
+            code0: codes.next().cloned(),
+            code1: codes.next().cloned(),
+            code2: codes.next().cloned(),
+            code3: codes.next().cloned(),
+            code4: codes.next().cloned(),
+            code5: codes.next().cloned(),
+            code6: codes.next().cloned(),
+            code7: codes.next().cloned(),
+            code8: codes.next().cloned(),
         }
     }
 }
@@ -334,9 +334,9 @@ impl QualityQualitativeCoding {
         let keys = speakers.keys().collect::<Vec<_>>();
         let split = keys.split(|k| **k == current).collect::<Vec<_>>();
         debug_assert!(split.len() == 2, "current was not in speakers");
-        let new_speaker_id = **split[1].first().or(split[0].first()).unwrap_or(&&current);
+        let new_speaker_id = **split[1].first().or_else(|| split[0].first()).unwrap_or(&&current);
         info!(current, new_speaker_id, "changed speaker_id");
-        return new_speaker_id;
+        new_speaker_id
     }
 }
 
@@ -376,7 +376,7 @@ impl eframe::App for QualityQualitativeCoding {
             .show(ctx, |ui| match interview {
                 None => ui.label("nothing to export"),
                 Some(InterviewSwiper { interview, .. }) => {
-                    export_interview::export_interview(&codes, ui, &interview)
+                    export_interview::export_interview(codes, ui, interview)
                 }
             });
 
@@ -472,7 +472,7 @@ impl eframe::App for QualityQualitativeCoding {
                 });
                 ui.group(|ui| {
                     ui.label("speakers");
-                    for (_, name) in &mut interview.interview.speakers {
+                    for name in interview.interview.speakers.values_mut() {
                         ui.text_edit_singleline(name);
                     }
                 });
