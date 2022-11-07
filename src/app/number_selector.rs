@@ -1,6 +1,5 @@
 use egui::{Response, Ui};
 
-
 pub fn number_changer(number: &mut usize) -> impl egui::Widget + '_ {
     move |ui: &mut Ui| number_changer_ui(number, ui)
 }

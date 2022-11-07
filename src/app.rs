@@ -334,7 +334,10 @@ impl QualityQualitativeCoding {
         let keys = speakers.keys().collect::<Vec<_>>();
         let split = keys.split(|k| **k == current).collect::<Vec<_>>();
         debug_assert!(split.len() == 2, "current was not in speakers");
-        let new_speaker_id = **split[1].first().or_else(|| split[0].first()).unwrap_or(&&current);
+        let new_speaker_id = **split[1]
+            .first()
+            .or_else(|| split[0].first())
+            .unwrap_or(&&current);
         info!(current, new_speaker_id, "changed speaker_id");
         new_speaker_id
     }
