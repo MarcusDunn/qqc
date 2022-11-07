@@ -79,6 +79,7 @@ impl QualityQualitativeCoding {
 enum Action {
     Next,
     Prev,
+    SwapSpeaker,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
@@ -270,7 +271,7 @@ impl eframe::App for QualityQualitativeCoding {
                 ui.group(|ui| {
                     ui.label("number of segments after");
                     ui.add(number_changer(&mut settings.context_after))
-                })
+                });
             });
 
         egui::TopBottomPanel::top("top bar").show(ctx, |ui| {
@@ -343,7 +344,13 @@ impl eframe::App for QualityQualitativeCoding {
                     if ui.button("prev").clicked() {
                         interview.try_prev();
                     }
-                })
+                });
+                ui.group(|ui| {
+                    ui.label("speakers");
+                    for (_, name) in &mut interview.interview.speakers {
+                        ui.text_edit_singleline(name);
+                    }
+                });
             });
 
             egui::TopBottomPanel::bottom("codes select").show(ctx, |ui| {
@@ -384,13 +391,16 @@ impl eframe::App for QualityQualitativeCoding {
                         ));
                         if section_response.clicked() {}
                     }
-                    // todo make this work with keybindings
 
                     let primary_section = ui.add(primary_section(
                         curr,
                         &interview.interview.speakers[&curr.speaker_id],
                     ));
-                    if ctx.input().key_pressed(Key::Space) {
+                    if ctx.input().key_pressed(settings.shortcut_map
+                        .get(&Action::SwapSpeaker)
+                        .copied()
+                        .unwrap_or(Key::Space)
+                    ) {
                         curr.speaker_id = Self::get_next_speaker_id(&interview.interview.speakers, curr.speaker_id)
                     }
                     if primary_section.clicked() {
