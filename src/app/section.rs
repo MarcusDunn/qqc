@@ -16,7 +16,8 @@ fn primary_section_ui(
     ui.vertical(|ui| {
         ui.label(speaker);
         ui.label(text);
-    }).response
+    })
+    .response
 }
 
 fn secondary_section_ui(
@@ -27,5 +28,6 @@ fn secondary_section_ui(
     ui.vertical(|ui| {
         ui.weak(speaker);
         ui.weak(text);
-    }).response
+    })
+    .response
 }

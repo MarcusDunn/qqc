@@ -77,36 +77,44 @@ impl QualityQualitativeCoding {
 }
 
 mod export_interview {
+    use crate::app::{Code, CsvSerializableSection, Interview, Section};
+    use csv::Writer;
+    use egui::{Response, Ui};
     use std::collections::BTreeMap;
     use std::error::Error;
     use std::fs::File;
     use std::io;
-    use csv::Writer;
-    use egui::{Response, Ui};
     use tracing::warn;
-    use crate::app::{Code, CsvSerializableSection, Interview, Section};
 
-    fn to_data_url_csv(interview: &[Section], speakers: &BTreeMap<u64, String>, codes: &[Code]) -> Result<String, Box<dyn Error>> {
+    fn to_data_url_csv(
+        interview: &[Section],
+        speakers: &BTreeMap<u64, String>,
+        codes: &[Code],
+    ) -> Result<String, Box<dyn Error>> {
         let writer = to_csv(Vec::new(), interview, speakers, codes);
         Ok(String::from("data:text/csv") + String::from_utf8(writer?.into_inner()?)?.as_str())
     }
 
-    fn to_csv<W: io::Write>(write: W, sections: &[Section], speakers: &BTreeMap<u64, String>, codes: &[Code]) -> Result<Writer<W>, Box<dyn Error>> {
+    fn to_csv<W: io::Write>(
+        write: W,
+        sections: &[Section],
+        speakers: &BTreeMap<u64, String>,
+        codes: &[Code],
+    ) -> Result<Writer<W>, Box<dyn Error>> {
         let mut writer = Writer::from_writer(write);
-        for record in sections.iter().map(|section| CsvSerializableSection::from_section(speakers, codes, &section)) {
+        for record in sections
+            .iter()
+            .map(|section| CsvSerializableSection::from_section(speakers, codes, &section))
+        {
             writer.serialize(record)?;
         }
         Ok(writer)
     }
 
-
-
     #[cfg(arget_arch = "wasm32")] // todo turn into egui component.
     fn export_web(codes: &[Code], ui: &mut Ui, interview: &Interview) -> Response {
         match to_data_url_csv(&interview.sections, &interview.speakers, &codes) {
-            Ok(data_url) => {
-                ui.hyperlink_to("download csv", data_url)
-            }
+            Ok(data_url) => ui.hyperlink_to("download csv", data_url),
             Err(err) => {
                 warn!(err, "failed to turn interview to data url");
                 ui.label("failed")
@@ -117,9 +125,7 @@ mod export_interview {
     #[cfg(not(arget_arch = "wasm32"))]
     fn export_native(codes: &[Code], ui: &mut Ui, interview: &Interview) -> Response {
         match write_to_file(codes, interview) {
-            Ok(()) => {
-                ui.label("wrote to file")
-            }
+            Ok(()) => ui.label("wrote to file"),
             Err(err) => {
                 warn!(err, "failed to write to file");
                 ui.label("failed to write to file")
@@ -127,8 +133,11 @@ mod export_interview {
         }
     }
 
-    fn write_to_file(codes: &[Code], interview: &Interview) -> Result<(), Box<dyn Error>>{
-        let mut result = File::options().create(true).write(true).open("export.csv")?;
+    fn write_to_file(codes: &[Code], interview: &Interview) -> Result<(), Box<dyn Error>> {
+        let mut result = File::options()
+            .create(true)
+            .write(true)
+            .open("export.csv")?;
         Ok(to_csv(result, &interview.sections, &interview.speakers, codes)?.flush()?)
     }
 
@@ -223,8 +232,19 @@ pub struct CsvSerializableSection {
 }
 
 impl CsvSerializableSection {
-    fn from_section(speakers: &BTreeMap<u64, String>, codes: &[Code], Section { speaker_id, codes: section_codes, text }: &Section) -> CsvSerializableSection {
-        let mut codes = section_codes.iter().map(|id| codes.get(*id).unwrap()).map(|Code { name, .. }| name);
+    fn from_section(
+        speakers: &BTreeMap<u64, String>,
+        codes: &[Code],
+        Section {
+            speaker_id,
+            codes: section_codes,
+            text,
+        }: &Section,
+    ) -> CsvSerializableSection {
+        let mut codes = section_codes
+            .iter()
+            .map(|id| codes.get(*id).unwrap())
+            .map(|Code { name, .. }| name);
         CsvSerializableSection {
             speaker: speakers[speaker_id].clone(),
             text: text.clone(),
@@ -310,7 +330,6 @@ impl QualityQualitativeCoding {
         file_upload::open_upload_dialog(interview_tx.clone(), ("json", &["json"]))
     }
 
-
     fn get_next_speaker_id(speakers: &BTreeMap<u64, String>, current: u64) -> u64 {
         let keys = speakers.keys().collect::<Vec<_>>();
         let split = keys.split(|k| **k == current).collect::<Vec<_>>();
@@ -354,14 +373,10 @@ impl eframe::App for QualityQualitativeCoding {
 
         egui::Window::new("export interview")
             .open(export_interview_open)
-            .show(ctx, |ui| {
-                match interview {
-                    None => {
-                        ui.label("nothing to export")
-                    }
-                    Some(InterviewSwiper { interview, .. }) => {
-                        export_interview::export_interview(&codes, ui, &interview)
-                    }
+            .show(ctx, |ui| match interview {
+                None => ui.label("nothing to export"),
+                Some(InterviewSwiper { interview, .. }) => {
+                    export_interview::export_interview(&codes, ui, &interview)
                 }
             });
 
@@ -393,7 +408,9 @@ impl eframe::App for QualityQualitativeCoding {
                     }
                 });
                 if codes.is_empty() && interview.is_none() {
-                    export_menu_button.response.on_hover_text("nothing to export");
+                    export_menu_button
+                        .response
+                        .on_hover_text("nothing to export");
                 }
                 ui.menu_button("import", |ui| {
                     if ui.button("codes").clicked() {
@@ -482,44 +499,51 @@ impl eframe::App for QualityQualitativeCoding {
             });
         }
 
-        egui::CentralPanel::default().show(ctx, |ui| {
-            match interview {
-                None => {
-                    if ui.button("Upload interview").clicked() {
-                        Self::open_interview_upload_dialog(interview_tx);
-                    }
+        egui::CentralPanel::default().show(ctx, |ui| match interview {
+            None => {
+                if ui.button("Upload interview").clicked() {
+                    Self::open_interview_upload_dialog(interview_tx);
                 }
-                Some(interview) => {
-                    ui.heading("coding interview");
-                    let (before, curr, after) = InterviewSwiper::window_mut(&mut interview.interview.sections, interview.index, settings.context_before, settings.context_after);
-                    for section in before {
-                        let section_response = ui.add(secondary_section(
-                            section,
-                            &interview.interview.speakers[&section.speaker_id],
-                        ));
-                        if section_response.clicked() {}
-                    }
-
-                    let primary_section = ui.add(primary_section(
-                        curr,
-                        &interview.interview.speakers[&curr.speaker_id],
+            }
+            Some(interview) => {
+                ui.heading("coding interview");
+                let (before, curr, after) = InterviewSwiper::window_mut(
+                    &mut interview.interview.sections,
+                    interview.index,
+                    settings.context_before,
+                    settings.context_after,
+                );
+                for section in before {
+                    let section_response = ui.add(secondary_section(
+                        section,
+                        &interview.interview.speakers[&section.speaker_id],
                     ));
-                    if ctx.input().key_pressed(settings.shortcut_map
+                    if section_response.clicked() {}
+                }
+
+                let primary_section = ui.add(primary_section(
+                    curr,
+                    &interview.interview.speakers[&curr.speaker_id],
+                ));
+                if ctx.input().key_pressed(
+                    settings
+                        .shortcut_map
                         .get(&Action::SwapSpeaker)
                         .copied()
-                        .unwrap_or(Key::Space)
-                    ) {
-                        curr.speaker_id = Self::get_next_speaker_id(&interview.interview.speakers, curr.speaker_id)
-                    }
-                    if primary_section.clicked() {
-                        curr.speaker_id = Self::get_next_speaker_id(&interview.interview.speakers, curr.speaker_id)
-                    }
-                    for section in after {
-                        ui.add(secondary_section(
-                            section,
-                            &interview.interview.speakers[&section.speaker_id],
-                        ));
-                    }
+                        .unwrap_or(Key::Space),
+                ) {
+                    curr.speaker_id =
+                        Self::get_next_speaker_id(&interview.interview.speakers, curr.speaker_id)
+                }
+                if primary_section.clicked() {
+                    curr.speaker_id =
+                        Self::get_next_speaker_id(&interview.interview.speakers, curr.speaker_id)
+                }
+                for section in after {
+                    ui.add(secondary_section(
+                        section,
+                        &interview.interview.speakers[&section.speaker_id],
+                    ));
                 }
             }
         });

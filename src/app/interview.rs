@@ -116,7 +116,8 @@ mod tests {
             },
             index: 2,
         };
-        let (before, curr, after) = InterviewSwiper::window_mut(&mut swiper.interview.sections, 2, 1, 1);
+        let (before, curr, after) =
+            InterviewSwiper::window_mut(&mut swiper.interview.sections, 2, 1, 1);
 
         assert_eq!(before.len(), 1);
         assert_eq!(after.len(), 1);
@@ -159,7 +160,8 @@ mod tests {
             },
             index: 0,
         };
-        let (before, curr, after) = InterviewSwiper::window_mut(&mut swiper.interview.sections, 0 , 1, 1);
+        let (before, curr, after) =
+            InterviewSwiper::window_mut(&mut swiper.interview.sections, 0, 1, 1);
 
         assert_eq!(before.len(), 0);
         assert_eq!(after.len(), 1);
@@ -202,7 +204,8 @@ fn test_window() {
         },
         index: 4,
     };
-    let (before, curr, after) = InterviewSwiper::window_mut(&mut swiper.interview.sections, 4 , 1, 1);
+    let (before, curr, after) =
+        InterviewSwiper::window_mut(&mut swiper.interview.sections, 4, 1, 1);
 
     assert_eq!(before.len(), 1);
     assert_eq!(after.len(), 0);
@@ -222,7 +225,8 @@ fn test_window_3() {
         },
         index: 0,
     };
-    let (before, curr, after) = InterviewSwiper::window_mut(&mut swiper.interview.sections, 0 , 0, 0);
+    let (before, curr, after) =
+        InterviewSwiper::window_mut(&mut swiper.interview.sections, 0, 0, 0);
     assert_eq!(before.len(), 0);
     assert_eq!(after.len(), 0);
     assert_eq!(curr.text, "0th")
