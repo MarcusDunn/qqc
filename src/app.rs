@@ -273,13 +273,9 @@ impl eframe::App for QualityQualitativeCoding {
                         *export_interview_open = true;
                     }
                 });
-                export_menu_button.response.on_hover_text(
-                    if codes.is_empty() && interview.is_none() {
-                        "nothing to export"
-                    } else {
-                        "export work"
-                    },
-                );
+                if codes.is_empty() && interview.is_none() {
+                    export_menu_button.response.on_hover_text("nothing to export");
+                }
                 ui.menu_button("import", |ui| {
                     if ui.button("codes").clicked() {
                         Self::open_tsv_upload_dialog(codes_tx);
@@ -368,13 +364,8 @@ impl eframe::App for QualityQualitativeCoding {
                 }
             }
             Some(interview) => {
-                let InterviewSwiper {
-                    interview: Interview {},
-                    index,
-                } = interview;
                 ui.heading("coding interview");
-                let (before, curr, after) =
-                    interview.window_mut(settings.context_before, settings.context_after);
+                let (before, curr, after) = InterviewSwiper::window_mut(&mut interview.interview.sections, interview.index, settings.context_before, settings.context_after);
                 for section in before {
                     let section_response = ui.add(secondary_section(
                         section,

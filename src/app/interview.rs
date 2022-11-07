@@ -5,7 +5,7 @@ use crate::app::{Interview, Section};
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 pub struct InterviewSwiper {
     pub interview: Interview,
-    index: usize,
+    pub(crate) index: usize,
 }
 
 impl InterviewSwiper {
@@ -43,28 +43,30 @@ impl InterviewSwiper {
         }
     }
 
-    pub fn window_mut(
-        &mut self,
+    pub fn window_mut<T>(
+        slice: &mut [T],
+        curr: usize,
         behind: usize,
         ahead: usize,
-    ) -> (&mut [Section], &mut Section, &mut [Section]) {
-        let (before, after) = self.interview.sections.split_at_mut(self.index);
-        let before = &mut before[self.index.saturating_sub(behind)..];
+    ) -> (&mut [T], &mut T, &mut [T]) {
+        let (before, after) = slice.split_at_mut(curr);
+        let before = &mut before[curr.saturating_sub(behind)..];
         debug_assert!(
             before.len() <= behind,
             "expected {} <= {}",
             before.len(),
             behind
         );
-        if let Some((curr, after)) = after.split_first_mut() {
-            let after = &mut after[0..min(after.len(), ahead)];
+        if let Some((center, after)) = after.split_first_mut() {
+            let len = after.len();
+            let after = &mut after[..ahead.min(len.saturating_sub(1))];
             debug_assert!(
                 after.len() <= ahead,
                 "expected {} <= {}",
                 after.len(),
                 ahead
             );
-            (before, curr, after)
+            (before, center, after)
         } else {
             panic!("index was invalid")
         }
@@ -83,7 +85,7 @@ mod tests {
 
     #[test]
     fn test_window() {
-        let swiper = InterviewSwiper {
+        let mut swiper = InterviewSwiper {
             interview: Interview {
                 speakers: BTreeMap::default(),
                 sections: vec![
@@ -116,7 +118,7 @@ mod tests {
             },
             index: 2,
         };
-        let (before, curr, after) = swiper.window(1, 1);
+        let (before, curr, after) = InterviewSwiper::window_mut(&mut swiper.interview.sections, 2, 1, 1);
 
         assert_eq!(before.len(), 1);
         assert_eq!(after.len(), 1);
@@ -126,7 +128,7 @@ mod tests {
 
     #[test]
     fn test_window_2() {
-        let swiper = InterviewSwiper {
+        let mut swiper = InterviewSwiper {
             interview: Interview {
                 speakers: BTreeMap::default(),
                 sections: vec![
@@ -159,7 +161,7 @@ mod tests {
             },
             index: 0,
         };
-        let (before, curr, after) = swiper.window(1, 1);
+        let (before, curr, after) = InterviewSwiper::window_mut(&mut swiper.interview.sections, 0 , 1, 1);
 
         assert_eq!(before.len(), 0);
         assert_eq!(after.len(), 1);
@@ -169,7 +171,7 @@ mod tests {
 
 #[test]
 fn test_window() {
-    let swiper = InterviewSwiper {
+    let mut swiper = InterviewSwiper {
         interview: Interview {
             speakers: std::collections::BTreeMap::default(),
             sections: vec![
@@ -202,7 +204,7 @@ fn test_window() {
         },
         index: 4,
     };
-    let (before, curr, after) = swiper.window(1, 1);
+    let (before, curr, after) = InterviewSwiper::window_mut(&mut swiper.interview.sections, 4 , 1, 1);
 
     assert_eq!(before.len(), 1);
     assert_eq!(after.len(), 0);
@@ -211,7 +213,7 @@ fn test_window() {
 
 #[test]
 fn test_window_3() {
-    let swiper = InterviewSwiper {
+    let mut swiper = InterviewSwiper {
         interview: Interview {
             speakers: std::collections::BTreeMap::default(),
             sections: vec![Section {
@@ -222,6 +224,8 @@ fn test_window_3() {
         },
         index: 0,
     };
-    let (_, curr, _) = swiper.window(0, 0);
+    let (before, curr, after) = InterviewSwiper::window_mut(&mut swiper.interview.sections, 0 , 0, 0);
+    assert_eq!(before.len(), 0);
+    assert_eq!(after.len(), 0);
     assert_eq!(curr.text, "0th")
 }
