@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 
 use egui::{Context, Key};
-use tracing::{error, info};
+use tracing::{error, info, trace};
 
 use crate::app::interview::InterviewSwiper;
 use crate::app::number_selector::number_changer;
@@ -209,6 +209,16 @@ impl QualityQualitativeCoding {
     fn open_interview_upload_dialog(interview_tx: &mut Sender<Vec<u8>>) {
         file_upload::open_upload_dialog(interview_tx.clone(), ("json", &["json"]))
     }
+
+
+    fn get_next_speaker_id(speakers: &BTreeMap<u64, String>, current: u64) -> u64 {
+        let keys = speakers.keys().collect::<Vec<_>>();
+        let split = keys.split(|k| **k == current).collect::<Vec<_>>();
+        debug_assert!(split.len() == 2, "current was not in speakers");
+        let new_speaker_id = **split[1].first().or(split[0].first()).unwrap_or(&&current);
+        info!(current, new_speaker_id, "changed speaker_id");
+        return new_speaker_id;
+    }
 }
 
 impl eframe::App for QualityQualitativeCoding {
@@ -357,31 +367,41 @@ impl eframe::App for QualityQualitativeCoding {
             });
         }
 
-        egui::CentralPanel::default().show(ctx, |ui| match interview {
-            None => {
-                if ui.button("Upload interview").clicked() {
-                    Self::open_interview_upload_dialog(interview_tx);
+        egui::CentralPanel::default().show(ctx, |ui| {
+            match interview {
+                None => {
+                    if ui.button("Upload interview").clicked() {
+                        Self::open_interview_upload_dialog(interview_tx);
+                    }
                 }
-            }
-            Some(interview) => {
-                ui.heading("coding interview");
-                let (before, curr, after) = InterviewSwiper::window_mut(&mut interview.interview.sections, interview.index, settings.context_before, settings.context_after);
-                for section in before {
-                    let section_response = ui.add(secondary_section(
-                        section,
-                        &interview.interview.speakers[&section.speaker_id],
+                Some(interview) => {
+                    ui.heading("coding interview");
+                    let (before, curr, after) = InterviewSwiper::window_mut(&mut interview.interview.sections, interview.index, settings.context_before, settings.context_after);
+                    for section in before {
+                        let section_response = ui.add(secondary_section(
+                            section,
+                            &interview.interview.speakers[&section.speaker_id],
+                        ));
+                        if section_response.clicked() {}
+                    }
+                    // todo make this work with keybindings
+
+                    let primary_section = ui.add(primary_section(
+                        curr,
+                        &interview.interview.speakers[&curr.speaker_id],
                     ));
-                    if section_response.clicked() {}
-                }
-                ui.add(primary_section(
-                    curr,
-                    &interview.interview.speakers[&curr.speaker_id],
-                ));
-                for section in after {
-                    ui.add(secondary_section(
-                        section,
-                        &interview.interview.speakers[&section.speaker_id],
-                    ));
+                    if ctx.input().key_pressed(Key::Space) {
+                        curr.speaker_id = Self::get_next_speaker_id(&interview.interview.speakers, curr.speaker_id)
+                    }
+                    if primary_section.clicked() {
+                        curr.speaker_id = Self::get_next_speaker_id(&interview.interview.speakers, curr.speaker_id)
+                    }
+                    for section in after {
+                        ui.add(secondary_section(
+                            section,
+                            &interview.interview.speakers[&section.speaker_id],
+                        ));
+                    }
                 }
             }
         });

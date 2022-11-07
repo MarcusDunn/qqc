@@ -1,5 +1,3 @@
-use std::cmp::min;
-
 use crate::app::{Interview, Section};
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
