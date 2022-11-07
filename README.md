@@ -5,6 +5,8 @@
 
 Quality Qualitative Coding (qqc) is a small graphical utility to enable collaberative qualitative coding of interviews. Try it out [here](https://marcusdunn.github.io/qqc/)!
 
+![img.png](img.png)
+
 ## Privacy and Security
 
 All data is stored locally as I simply cannot affort a server!

@@ -398,6 +398,9 @@ impl eframe::App for QualityQualitativeCoding {
                     ui.label("number of segments after");
                     ui.add(number_changer(&mut settings.context_after))
                 });
+                if ui.button("reset (DANGER)").clicked() {
+                    *interview = None;
+                }
             });
 
         egui::TopBottomPanel::top("top bar").show(ctx, |ui| {
