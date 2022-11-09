@@ -1,4 +1,4 @@
-use crate::app::{Code, CsvSerializableSection, Interview, Section};
+use crate::app::{Code, CsvSerializableSection, Interview};
 use csv::Writer;
 use egui::{Response, Ui};
 use serde::Serialize;
@@ -7,29 +7,30 @@ use std::fs::File;
 use std::io;
 use tracing::warn;
 
-fn to_data_url_csv<T: Serialize>(
-    iter: impl Iterator<Item=T>
-) -> Result<String, Box<dyn Error>> {
-    let writer = to_csv(
-        Vec::new(),
-        iter,
-    );
+fn to_data_url_csv<T: Serialize>(iter: impl Iterator<Item = T>) -> Result<String, Box<dyn Error>> {
+    let writer = to_csv(Vec::new(), iter);
     Ok(String::from("data:text/csv") + String::from_utf8(writer?.into_inner()?)?.as_str())
 }
 
 fn to_csv<W: io::Write, I: Serialize>(
     write: W,
-    iterator: impl Iterator<Item = I>,
+    mut iterator: impl Iterator<Item = I>,
 ) -> Result<Writer<W>, csv::Error> {
     let mut writer = Writer::from_writer(write);
-    iterator
-        .map(|record| writer.serialize(record))
-        .collect::<Result<_, _>>()?;
+    iterator.try_for_each(|record| writer.serialize(record))?;
     Ok(writer)
 }
 
-fn export_web(codes: &[Code], ui: &mut Ui, Interview { speakers, sections }: &Interview) -> Response {
-    match to_data_url_csv(sections.iter().map(|section| CsvSerializableSection::from_section(speakers, codes, section) )) {
+fn export_web(
+    codes: &[Code],
+    ui: &mut Ui,
+    Interview { speakers, sections }: &Interview,
+) -> Response {
+    match to_data_url_csv(
+        sections
+            .iter()
+            .map(|section| CsvSerializableSection::from_section(speakers, codes, section)),
+    ) {
         Ok(data_url) => ui.hyperlink_to("download csv", data_url),
         Err(err) => {
             warn!(err, "failed to turn interview to data url");
@@ -90,9 +91,7 @@ fn write_codes_to_file(codes: &[Code]) -> Result<(), Box<dyn Error>> {
 
 fn export_codes_native(codes: &[Code], ui: &mut Ui) -> Response {
     match write_codes_to_file(codes) {
-        Ok(()) => {
-            ui.label("created file export_codes.csv")
-        }
+        Ok(()) => ui.label("created file export_codes.csv"),
         Err(err) => {
             warn!(?err);
             ui.label("failed to write codes to file")
