@@ -9,6 +9,7 @@ use crate::app::interview::InterviewSwiper;
 use crate::app::number_selector::number_changer;
 use crate::app::section::{primary_section, secondary_section};
 
+mod export;
 mod file_upload;
 mod interview;
 mod parse_interview;
@@ -73,80 +74,6 @@ impl QualityQualitativeCoding {
                 interview.try_next();
             }
         }
-    }
-}
-
-mod export_interview {
-    use crate::app::{Code, CsvSerializableSection, Interview, Section};
-    use csv::Writer;
-    use egui::{Response, Ui};
-    use std::collections::BTreeMap;
-    use std::error::Error;
-    use std::fs::File;
-    use std::io;
-    use tracing::warn;
-
-    #[cfg(target_arch = "wasm32")]
-    fn to_data_url_csv(
-        interview: &[Section],
-        speakers: &BTreeMap<u64, String>,
-        codes: &[Code],
-    ) -> Result<String, Box<dyn Error>> {
-        let writer = to_csv(Vec::new(), interview, speakers, codes);
-        Ok(String::from("data:text/csv") + String::from_utf8(writer?.into_inner()?)?.as_str())
-    }
-
-    fn to_csv<W: io::Write>(
-        write: W,
-        sections: &[Section],
-        speakers: &BTreeMap<u64, String>,
-        codes: &[Code],
-    ) -> Result<Writer<W>, Box<dyn Error>> {
-        let mut writer = Writer::from_writer(write);
-        for record in sections
-            .iter()
-            .map(|section| CsvSerializableSection::from_section(speakers, codes, section))
-        {
-            writer.serialize(record)?;
-        }
-        Ok(writer)
-    }
-
-    #[cfg(target_arch = "wasm32")] // todo turn into egui component.
-    fn export_web(codes: &[Code], ui: &mut Ui, interview: &Interview) -> Response {
-        match to_data_url_csv(&interview.sections, &interview.speakers, &codes) {
-            Ok(data_url) => ui.hyperlink_to("download csv", data_url),
-            Err(err) => {
-                warn!(err, "failed to turn interview to data url");
-                ui.label("failed")
-            }
-        }
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    fn export_native(codes: &[Code], ui: &mut Ui, interview: &Interview) -> Response {
-        match write_to_file(codes, interview) {
-            Ok(()) => ui.label("wrote to file"),
-            Err(err) => {
-                warn!(err, "failed to write to file");
-                ui.label("failed to write to file")
-            }
-        }
-    }
-
-    fn write_to_file(codes: &[Code], interview: &Interview) -> Result<(), Box<dyn Error>> {
-        let result = File::options()
-            .create(true)
-            .write(true)
-            .open("export.csv")?;
-        Ok(to_csv(result, &interview.sections, &interview.speakers, codes)?.flush()?)
-    }
-
-    pub fn export_interview(codes: &[Code], ui: &mut Ui, interview: &Interview) -> Response {
-        #[cfg(target_arch = "wasm32")]
-        return export_web(codes, ui, interview);
-        #[cfg(not(target_arch = "wasm32"))]
-        return export_native(codes, ui, interview);
     }
 }
 
@@ -373,22 +300,14 @@ impl eframe::App for QualityQualitativeCoding {
 
         egui::Window::new("export codes")
             .open(export_codes_open)
-            .show(ctx, |ui| {
-                ui.heading("copy and paste the below text.");
-                ui.label(
-                    codes
-                        .iter()
-                        .map(|Code { description, name }| format!("{}\t{}\n", name, description))
-                        .collect::<String>(),
-                )
-            });
+            .show(ctx, |ui| export::export_codes(codes, ui));
 
         egui::Window::new("export interview")
             .open(export_interview_open)
             .show(ctx, |ui| match interview {
                 None => ui.label("nothing to export"),
                 Some(InterviewSwiper { interview, .. }) => {
-                    export_interview::export_interview(codes, ui, interview)
+                    export::export_interview(codes, ui, interview)
                 }
             });
 
