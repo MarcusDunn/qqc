@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::ops::Deref;
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 
 use egui::{Context, Key};
@@ -49,7 +50,7 @@ impl QualityQualitativeCoding {
             shortcut_map
                 .get(&Action::Prev)
                 .copied()
-                .unwrap_or(Key::ArrowLeft),
+                .unwrap_or(Key::ArrowUp),
         ) {
             if let Some(interview) = interview {
                 interview.try_prev();
@@ -66,7 +67,7 @@ impl QualityQualitativeCoding {
             shortcut_map
                 .get(&Action::Next)
                 .copied()
-                .unwrap_or(Key::ArrowRight),
+                .unwrap_or(Key::ArrowDown),
         ) {
             if let Some(interview) = interview {
                 interview.try_next();
@@ -299,13 +300,21 @@ impl QualityQualitativeCoding {
     ) {
         match receiver.try_recv() {
             Ok(bytes) => {
-                match parse_interview::from_json_slice(&bytes) {
-                    Ok(parsed_interview) => {
-                        tracing::trace!("parsed interview");
-                        *interview = Some(InterviewSwiper::new(parsed_interview))
+
+                match std::str::from_utf8(bytes.deref())  {
+                    Ok(utf8str) => {
+                        match parse_interview::parse(utf8str) {
+                            Ok(parsed_interview) => {
+                                tracing::trace!(?parsed_interview);
+                                *interview = Some(InterviewSwiper::new(parsed_interview))
+                            }
+                            Err(err) => {
+                                tracing::trace!(error = ?err, "failed to parse json");
+                            }
+                        }
                     }
                     Err(err) => {
-                        tracing::trace!(error = ?err, "failed to parse json");
+                        tracing::warn!(error = ?err, "failed to parse utf8");
                     }
                 };
             }
@@ -327,7 +336,7 @@ impl QualityQualitativeCoding {
     }
 
     fn open_interview_upload_dialog(interview_tx: &mut Sender<Vec<u8>>) {
-        file_upload::open_upload_dialog(interview_tx.clone(), ("json", &["json"]))
+        file_upload::open_upload_dialog(interview_tx.clone(), ("interview", parse_interview::file_extensions()))
     }
 
     fn get_next_speaker_id(speakers: &BTreeMap<u64, String>, current: u64) -> u64 {
@@ -536,7 +545,7 @@ impl eframe::App for QualityQualitativeCoding {
                         .shortcut_map
                         .get(&Action::SwapSpeaker)
                         .copied()
-                        .unwrap_or(Key::Space),
+                        .unwrap_or(Key::ArrowRight),
                 ) {
                     curr.speaker_id =
                         Self::get_next_speaker_id(&interview.interview.speakers, curr.speaker_id)
