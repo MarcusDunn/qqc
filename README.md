@@ -19,7 +19,7 @@ Quality Qualitative Coding (qqc) is a small graphical utility to enable collabor
 
 ## Privacy and Security
 
-All data is stored locally as I simply cannot affort a server!
+All data is stored locally as I simply cannot afford a server!
 
 ## There's very little javascript in this webapp
 

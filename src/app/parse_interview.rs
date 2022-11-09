@@ -100,8 +100,8 @@ Marcus Dunn: ewubfqofbweqpfboifjwnpfiwjn pviwljan pilsn pajn wpailfjn owefba ou
 
 mod vtt {
     use crate::app::{Interview, Section};
-    use std::collections::{BTreeMap, BTreeSet};
     use std::collections::btree_map::Entry;
+    use std::collections::{BTreeMap, BTreeSet};
     use std::num::ParseIntError;
     use std::ops::Deref;
     use tracing::info;
@@ -128,7 +128,7 @@ mod vtt {
                             speaker_id += 1;
                             *v.insert(speaker_id)
                         }
-                        Entry::Occupied(o) => { *o.get() }
+                        Entry::Occupied(o) => *o.get(),
                     }
                 } else {
                     UNKNOWN_SPEAKER_ID
@@ -150,17 +150,13 @@ mod vtt {
         type Error = VttEntryParseError;
 
         fn try_from(value: &str) -> Result<Self, Self::Error> {
-            let normalized = value
-                .replace("\r\n", "\n");
+            let normalized = value.replace("\r\n", "\n");
             let split = normalized
                 .split("\n\n")
                 .filter(|s| !s.is_empty())
                 .collect::<Vec<_>>();
             info!(?split);
-            let skip = split
-                .into_iter()
-                .skip(1)
-                .collect::<Vec<_>>();
+            let skip = split.into_iter().skip(1).collect::<Vec<_>>();
             info!(?skip);
             let map = skip
                 .into_iter()
@@ -172,7 +168,7 @@ mod vtt {
     }
 
     impl FromIterator<VttEntry> for Vtt {
-        fn from_iter<T: IntoIterator<Item=VttEntry>>(iter: T) -> Self {
+        fn from_iter<T: IntoIterator<Item = VttEntry>>(iter: T) -> Self {
             Vtt(Vec::from_iter(iter))
         }
     }
@@ -215,13 +211,15 @@ mod vtt {
                 .next()
                 .ok_or_else(|| VttEntryParseError::MissingIndex(value.to_string()))?
                 .parse::<usize>()?;
-            let _timestamps = lines.next().ok_or_else(|| VttEntryParseError::MissingTimestamps(value.to_string()))?;
+            let _timestamps = lines
+                .next()
+                .ok_or_else(|| VttEntryParseError::MissingTimestamps(value.to_string()))?;
             let text = lines
                 .next()
                 .ok_or_else(|| VttEntryParseError::MissingText(value.to_string()))?;
             let (speaker, text) = match text.split_once(": ") {
-                None => { (None, text) }
-                Some((speaker, text)) => { (Some(speaker), text) }
+                None => (None, text),
+                Some((speaker, text)) => (Some(speaker), text),
             };
             debug_assert!(lines.next().is_none(), "entry contained more than 3 lines");
             Ok(VttEntry {

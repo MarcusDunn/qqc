@@ -300,19 +300,16 @@ impl QualityQualitativeCoding {
     ) {
         match receiver.try_recv() {
             Ok(bytes) => {
-
-                match std::str::from_utf8(bytes.deref())  {
-                    Ok(utf8str) => {
-                        match parse_interview::parse(utf8str) {
-                            Ok(parsed_interview) => {
-                                tracing::trace!(?parsed_interview);
-                                *interview = Some(InterviewSwiper::new(parsed_interview))
-                            }
-                            Err(err) => {
-                                tracing::trace!(error = ?err, "failed to parse json");
-                            }
+                match std::str::from_utf8(bytes.deref()) {
+                    Ok(utf8str) => match parse_interview::parse(utf8str) {
+                        Ok(parsed_interview) => {
+                            tracing::trace!(?parsed_interview);
+                            *interview = Some(InterviewSwiper::new(parsed_interview))
                         }
-                    }
+                        Err(err) => {
+                            tracing::trace!(error = ?err, "failed to parse json");
+                        }
+                    },
                     Err(err) => {
                         tracing::warn!(error = ?err, "failed to parse utf8");
                     }
@@ -336,7 +333,10 @@ impl QualityQualitativeCoding {
     }
 
     fn open_interview_upload_dialog(interview_tx: &mut Sender<Vec<u8>>) {
-        file_upload::open_upload_dialog(interview_tx.clone(), ("interview", parse_interview::file_extensions()))
+        file_upload::open_upload_dialog(
+            interview_tx.clone(),
+            ("interview", parse_interview::file_extensions()),
+        )
     }
 
     fn get_next_speaker_id(speakers: &BTreeMap<u64, String>, current: u64) -> u64 {
