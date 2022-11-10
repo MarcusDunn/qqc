@@ -1,8 +1,10 @@
+use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, BTreeSet};
+use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 
-use egui::{Context, Key};
+use egui::{Context, Key, TextBuffer};
 use tracing::{error, info};
 
 use crate::app::interview::InterviewSwiper;
@@ -33,6 +35,7 @@ pub struct QualityQualitativeCoding {
     settings_open: bool,
     export_codes_open: bool,
     export_interview_open: bool,
+    speaker_builder: String,
 }
 
 impl QualityQualitativeCoding {
@@ -118,6 +121,7 @@ impl Default for QualityQualitativeCoding {
             settings_open: false,
             export_codes_open: false,
             export_interview_open: false,
+            speaker_builder: "".to_string(),
         }
     }
 }
@@ -293,6 +297,7 @@ impl eframe::App for QualityQualitativeCoding {
             settings_open,
             export_codes_open,
             export_interview_open,
+            speaker_builder,
         } = self;
 
         Self::try_update_interview(interview, interview_rx);
@@ -408,6 +413,18 @@ impl eframe::App for QualityQualitativeCoding {
                     ui.label("speakers");
                     for name in interview.interview.speakers.values_mut() {
                         ui.text_edit_singleline(name);
+                    }
+                    ui.label("new speaker");
+                    ui.text_edit_singleline(speaker_builder);
+                    if ui.button("add").clicked() {
+                        interview.interview.speakers.insert(
+                            {
+                                let mut hasher = DefaultHasher::new();
+                                speaker_builder.hash(&mut hasher);
+                                hasher.finish()
+                            },
+                            speaker_builder.take(),
+                        );
                     }
                 });
             });

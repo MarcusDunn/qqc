@@ -11,7 +11,7 @@ enum InterviewFormat {
 }
 
 pub fn file_extensions() -> &'static [&'static str] {
-    &["json", "vtt"]
+    &["json", "vtt", "srt"]
 }
 
 impl TryFrom<&str> for InterviewFormat {
