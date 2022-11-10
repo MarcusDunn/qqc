@@ -10,7 +10,7 @@ use tracing::warn;
 #[cfg(target_arch = "wasm32")]
 fn to_data_url_csv<T: Serialize>(iter: impl Iterator<Item = T>) -> Result<String, Box<dyn Error>> {
     let writer = to_csv(Vec::new(), iter);
-    Ok(String::from("data:text/csv,") + urlencoding::encode(String::from_utf8(writer?.into_inner()?)?.as_str()))
+    Ok(String::from("data:text/csv,") + &urlencoding::encode(String::from_utf8(writer?.into_inner()?)?.as_str()))
 }
 
 fn to_csv<W: io::Write, I: Serialize>(
