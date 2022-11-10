@@ -244,7 +244,7 @@ Marcus Dunn: Yo yo yo yo, this is a test";
                 entry.try_into(),
                 Ok(VttEntry {
                     index: 1,
-                    speaker: "Marcus Dunn".to_string(),
+                    speaker: Some("Marcus Dunn".to_string()),
                     text: "Yo yo yo yo, this is a test".to_string(),
                 })
             );
