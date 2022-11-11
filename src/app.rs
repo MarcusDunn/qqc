@@ -2,9 +2,10 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, BTreeSet};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
+use std::slice::Iter;
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 
-use egui::{Context, Key, TextBuffer};
+use egui::{Context, Key, TextBuffer, Ui};
 use tracing::{error, info};
 
 use crate::app::interview::InterviewSwiper;
@@ -54,7 +55,7 @@ impl QualityQualitativeCoding {
             shortcut_map
                 .get(&Action::Prev)
                 .copied()
-                .unwrap_or(Key::ArrowUp),
+                .unwrap_or_else(|| Action::Prev.default_key())
         ) {
             if let Some(interview) = interview {
                 interview.try_prev();
@@ -71,26 +72,60 @@ impl QualityQualitativeCoding {
             shortcut_map
                 .get(&Action::Next)
                 .copied()
-                .unwrap_or(Key::ArrowDown),
+                .unwrap_or_else(|| Action::Next.default_key()),
         ) {
             if let Some(interview) = interview {
                 interview.try_next();
             }
         }
     }
+
+    fn hash(target: &impl Hash) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        target.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    fn set_key_for_action(settings: &mut Settings, ui: &mut Ui, action: &Action) {
+        ui.group(|ui| {
+            ui.label(format!("{:?}: {:?}", action, settings.shortcut_map.get(action).copied().unwrap_or_else(|| action.default_key())));
+            if ui.button("change").clicked() {
+                settings.setting_key = Some(*action)
+            }
+        });
+    }
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Debug, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone)]
 enum Action {
     Next,
     Prev,
     SwapSpeaker,
 }
 
+impl Action {
+    fn default_key(&self) -> Key {
+        match self {
+            Action::Next => Key::ArrowDown,
+            Action::Prev => Key::ArrowUp,
+            Action::SwapSpeaker => Key::ArrowRight,
+        }
+    }
+
+    fn iter() -> Iter<'static, Action> {
+        [
+            Action::Next,
+            Action::Prev,
+            Action::SwapSpeaker,
+        ].iter()
+    }
+}
+
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 struct Settings {
     code_columns: usize,
     shortcut_map: BTreeMap<Action, Key>,
+    setting_key: Option<Action>,
     context_before: usize,
     context_after: usize,
 }
@@ -100,6 +135,7 @@ impl Default for Settings {
         Self {
             code_columns: 5,
             shortcut_map: BTreeMap::default(),
+            setting_key: None,
             context_before: 1,
             context_after: 1,
         }
@@ -319,21 +355,56 @@ impl eframe::App for QualityQualitativeCoding {
         egui::Window::new("settings")
             .open(settings_open)
             .show(ctx, |ui| {
-                ui.group(|ui| {
-                    ui.label("Codes per row");
-                    ui.add(number_changer(&mut settings.code_columns))
+                ui.horizontal(|ui| {
+                    ui.heading("aesthetics");
+                    ui.group(|ui| {
+                        ui.label("Codes per row");
+                        ui.add(number_changer(&mut settings.code_columns))
+                    });
+                    ui.group(|ui| {
+                        ui.label("number of segments before");
+                        ui.add(number_changer(&mut settings.context_before))
+                    });
+                    ui.group(|ui| {
+                        ui.label("number of segments after");
+                        ui.add(number_changer(&mut settings.context_after))
+                    });
                 });
-                ui.group(|ui| {
-                    ui.label("number of segments before");
-                    ui.add(number_changer(&mut settings.context_before))
+                ui.add_space(20.0);
+                ui.horizontal(|ui| {
+                    ui.heading("shortcuts");
+                    ui.group(|ui| {
+                        if let Some(action) = settings.setting_key {
+                            ui.label(format!("setting {:?}", action));
+                            if ui.button("cancel").clicked() {
+                                settings.setting_key = None;
+                            }
+                            if let Some(key) = ctx.input().keys_down.iter().next() {
+                                settings.shortcut_map.insert(action, *key);
+                                settings.setting_key = None;
+                            }
+                        }
+                        for action in Action::iter() {
+                            Self::set_key_for_action(settings, ui, action);
+                        }
+                        if ui.button("reset").on_hover_text("reset the shortcuts to their defaults").clicked() {
+                            for action in Action::iter() {
+                                settings.shortcut_map.insert(*action, action.default_key());
+                            }
+                        }
+                    });
                 });
-                ui.group(|ui| {
-                    ui.label("number of segments after");
-                    ui.add(number_changer(&mut settings.context_after))
-                });
-                if ui.button("reset (DANGER)").clicked() {
-                    *interview = None;
-                }
+                ui.add_space(20.0);
+                ui.horizontal(|ui| {
+                    ui.heading("the danger zone");
+
+                    if ui
+                        .button("reset")
+                        .on_hover_text("delete this invterview and start coding a new one")
+                        .clicked() {
+                        *interview = None;
+                    }
+                })
             });
 
         egui::TopBottomPanel::top("top bar").show(ctx, |ui| {
@@ -418,11 +489,7 @@ impl eframe::App for QualityQualitativeCoding {
                     ui.text_edit_singleline(speaker_builder);
                     if ui.button("add").clicked() {
                         interview.interview.speakers.insert(
-                            {
-                                let mut hasher = DefaultHasher::new();
-                                speaker_builder.hash(&mut hasher);
-                                hasher.finish()
-                            },
+                            Self::hash(speaker_builder),
                             speaker_builder.take(),
                         );
                     }
