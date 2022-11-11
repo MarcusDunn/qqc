@@ -259,8 +259,8 @@ impl QualityQualitativeCoding {
         codes.push(Code { name, description });
     }
 
-    fn open_tsv_upload_dialog(codes_tx: &mut Sender<Vec<u8>>) {
-        file_upload::open_upload_dialog(codes_tx.clone(), ("tsv", &["tsv"]))
+    fn open_csv_upload_dialog(codes_tx: &mut Sender<Vec<u8>>) {
+        file_upload::open_upload_dialog(codes_tx.clone(), ("csv", &["csv"]))
     }
 
     fn open_interview_upload_dialog(interview_tx: &mut Sender<Vec<u8>>) {
@@ -353,7 +353,7 @@ impl eframe::App for QualityQualitativeCoding {
                 }
                 ui.menu_button("import", |ui| {
                     if ui.button("codes").clicked() {
-                        Self::open_tsv_upload_dialog(codes_tx);
+                        Self::open_csv_upload_dialog(codes_tx);
                     }
                 });
                 if ui.button("settings").clicked() {
@@ -452,6 +452,9 @@ impl eframe::App for QualityQualitativeCoding {
 
         egui::CentralPanel::default().show(ctx, |ui| match interview {
             None => {
+                ui.heading("quality qualitative coding");
+                ui.label("welcome to quality qualitative coding. To start, upload an interview. If you run into any issues or have any suggestion please let Marcus know on the issue tracker.");
+                ui.hyperlink_to("github", "https://github.com/marcusdunn/qqc");
                 if ui.button("Upload interview").clicked() {
                     Self::open_interview_upload_dialog(interview_tx);
                 }
