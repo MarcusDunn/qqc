@@ -1,3 +1,4 @@
+use csv::Error;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, BTreeSet};
 use std::hash::{Hash, Hasher};
@@ -249,16 +250,18 @@ impl QualityQualitativeCoding {
     fn try_update_codes(codes: &mut Vec<Code>, codes_recv: &mut Receiver<Vec<u8>>) {
         match codes_recv.try_recv() {
             Ok(bytes) => {
-                codes.clear();
-                let mut reader = csv::Reader::from_reader(&bytes[..]);
-                for record in reader.deserialize::<Code>() {
-                    match record {
-                        Ok(record) => codes.push(record),
-                        Err(err) => {
-                            error!(error = ?err, "failed to parse csv")
-                        }
+                match csv::Reader::from_reader(&bytes[..])
+                    .deserialize::<Code>()
+                    .into_iter()
+                    .collect::<Result<Vec<_>, _>>()
+                {
+                    Ok(record) => {
+                        *codes = record;
                     }
-                }
+                    Err(err) => {
+                        error!(error = ?err, "failed to parse csv");
+                    }
+                };
             }
             Err(TryRecvError::Empty) => { /* no file has been uploaded yet - no problem! */ }
             Err(TryRecvError::Disconnected) => {
