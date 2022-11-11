@@ -55,7 +55,7 @@ impl QualityQualitativeCoding {
             shortcut_map
                 .get(&Action::Prev)
                 .copied()
-                .unwrap_or_else(|| Action::Prev.default_key())
+                .unwrap_or_else(|| Action::Prev.default_key()),
         ) {
             if let Some(interview) = interview {
                 interview.try_prev();
@@ -88,7 +88,15 @@ impl QualityQualitativeCoding {
 
     fn set_key_for_action(settings: &mut Settings, ui: &mut Ui, action: &Action) {
         ui.group(|ui| {
-            ui.label(format!("{:?}: {:?}", action, settings.shortcut_map.get(action).copied().unwrap_or_else(|| action.default_key())));
+            ui.label(format!(
+                "{:?}: {:?}",
+                action,
+                settings
+                    .shortcut_map
+                    .get(action)
+                    .copied()
+                    .unwrap_or_else(|| action.default_key())
+            ));
             if ui.button("change").clicked() {
                 settings.setting_key = Some(*action)
             }
@@ -96,7 +104,9 @@ impl QualityQualitativeCoding {
     }
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone)]
+#[derive(
+    serde::Deserialize, serde::Serialize, Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone,
+)]
 enum Action {
     Next,
     Prev,
@@ -113,11 +123,7 @@ impl Action {
     }
 
     fn iter() -> Iter<'static, Action> {
-        [
-            Action::Next,
-            Action::Prev,
-            Action::SwapSpeaker,
-        ].iter()
+        [Action::Next, Action::Prev, Action::SwapSpeaker].iter()
     }
 }
 
@@ -387,7 +393,11 @@ impl eframe::App for QualityQualitativeCoding {
                         for action in Action::iter() {
                             Self::set_key_for_action(settings, ui, action);
                         }
-                        if ui.button("reset").on_hover_text("reset the shortcuts to their defaults").clicked() {
+                        if ui
+                            .button("reset")
+                            .on_hover_text("reset the shortcuts to their defaults")
+                            .clicked()
+                        {
                             for action in Action::iter() {
                                 settings.shortcut_map.insert(*action, action.default_key());
                             }
@@ -401,7 +411,8 @@ impl eframe::App for QualityQualitativeCoding {
                     if ui
                         .button("reset")
                         .on_hover_text("delete this invterview and start coding a new one")
-                        .clicked() {
+                        .clicked()
+                    {
                         *interview = None;
                     }
                 })
@@ -488,10 +499,10 @@ impl eframe::App for QualityQualitativeCoding {
                     ui.label("new speaker");
                     ui.text_edit_singleline(speaker_builder);
                     if ui.button("add").clicked() {
-                        interview.interview.speakers.insert(
-                            Self::hash(speaker_builder),
-                            speaker_builder.take(),
-                        );
+                        interview
+                            .interview
+                            .speakers
+                            .insert(Self::hash(speaker_builder), speaker_builder.take());
                     }
                 });
             });
