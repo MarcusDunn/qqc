@@ -538,7 +538,10 @@ impl eframe::App for QualityQualitativeCoding {
                 }
             }
             Some(interview) => {
-                ui.heading("coding interview");
+                ui.horizontal(|ui| {
+                    ui.heading("Coding!");
+                    ui.weak(format!("{} of {}", interview.index, interview.interview.sections.len()));
+                });
                 let (before, curr, after) = InterviewSwiper::window_mut(
                     &mut interview.interview.sections,
                     interview.index,
